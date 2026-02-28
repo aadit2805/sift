@@ -6,7 +6,7 @@ AI-powered course planning for Texas A&M students. Sift combines grade distribut
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui |
+| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui, TanStack Query |
 | Backend | Express.js (TypeScript) |
 | Database | Supabase (PostgreSQL) |
 | Data Sources | Anex grade distributions, RateMyProfessors |
