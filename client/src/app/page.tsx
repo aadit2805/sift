@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,10 +23,10 @@ import {
   getCompletedCourses,
   setCompletedCourses,
 } from "@/components/course-editor";
-import { getRecommendations, getRemainingRequirements } from "@/lib/api";
-import type { ScoredCourse, RemainingRequirement } from "@/lib/types";
+import { useRecommendations, useRemainingRequirements, queryKeys } from "@/lib/queries";
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [semester, setSemester] = useState("Fall 2026");
   const [weights, setWeights] = useState<Record<string, number>>({
@@ -45,15 +46,29 @@ export default function Dashboard() {
     setCoursesLoaded(true);
   }, []);
 
-  const [courses, setCourses] = useState<ScoredCourse[]>([]);
-  const [remaining, setRemaining] = useState<RemainingRequirement[]>([]);
-  const [totalRequired, setTotalRequired] = useState(0);
-  const [totalCompleted, setTotalCompleted] = useState(0);
-  const [progressPct, setProgressPct] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [apiStatus, setApiStatus] = useState<
-    "connected" | "error" | "loading"
-  >("loading");
+  const recsQuery = useRecommendations(
+    {
+      major: "CS",
+      completed_courses: completedCourses,
+      preferences: weights,
+      semester,
+    },
+    coursesLoaded
+  );
+
+  const degreeQuery = useRemainingRequirements("CS", completedCourses, coursesLoaded);
+
+  const courses = recsQuery.data ?? [];
+  const remaining = degreeQuery.data?.remaining ?? [];
+  const totalRequired = degreeQuery.data?.total_credits_required ?? 0;
+  const totalCompleted = degreeQuery.data?.total_credits_completed ?? 0;
+  const progressPct = degreeQuery.data?.progress_pct ?? 0;
+  const loading = recsQuery.isLoading || degreeQuery.isLoading;
+  const apiStatus: "connected" | "error" | "loading" = loading
+    ? "loading"
+    : recsQuery.isError && degreeQuery.isError
+      ? "error"
+      : "connected";
 
   const requirementTypeMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -64,52 +79,6 @@ export default function Dashboard() {
     }
     return map;
   }, [remaining]);
-
-  useEffect(() => {
-    if (!coursesLoaded) return;
-    let cancelled = false;
-
-    async function loadData() {
-      setLoading(true);
-      setApiStatus("loading");
-
-      const [recsResult, degreeResult] = await Promise.all([
-        getRecommendations({
-          major: "CS",
-          completed_courses: completedCourses,
-          preferences: weights,
-          semester,
-        }),
-        getRemainingRequirements("CS", completedCourses),
-      ]);
-
-      if (cancelled) return;
-
-      if (recsResult.error && degreeResult.error) {
-        setApiStatus("error");
-      } else {
-        setApiStatus("connected");
-      }
-
-      if (recsResult.data) {
-        setCourses(recsResult.data);
-      }
-
-      if (degreeResult.data) {
-        setRemaining(degreeResult.data.remaining);
-        setTotalRequired(degreeResult.data.total_credits_required);
-        setTotalCompleted(degreeResult.data.total_credits_completed);
-        setProgressPct(degreeResult.data.progress_pct);
-      }
-
-      setLoading(false);
-    }
-
-    loadData();
-    return () => {
-      cancelled = true;
-    };
-  }, [semester, completedCourses, coursesLoaded]);
 
   const filteredCourses = useMemo(() => {
     let filtered = [...courses];
@@ -137,14 +106,18 @@ export default function Dashboard() {
       setCompleted(completed);
       setCompletedCourses(completed);
       setShowTranscript(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.recommendations.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.degreePlan.all });
     },
-    []
+    [queryClient]
   );
 
   const handleEditorSave = useCallback((courses: string[]) => {
     setCompleted(courses);
     setShowEditor(false);
-  }, []);
+    queryClient.invalidateQueries({ queryKey: queryKeys.recommendations.all });
+    queryClient.invalidateQueries({ queryKey: queryKeys.degreePlan.all });
+  }, [queryClient]);
 
   return (
     <div className="min-h-screen bg-background">

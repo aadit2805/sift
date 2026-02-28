@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { getRemainingRequirements } from "@/lib/api";
-import type { RemainingRequirement, DegreeProgress } from "@/lib/types";
+import { useRemainingRequirements } from "@/lib/queries";
+import type { RemainingRequirement } from "@/lib/types";
 
 function getCompletedCourses(): string[] {
   if (typeof window === "undefined") return [];
@@ -86,38 +86,24 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function PlanPage() {
-  const [remaining, setRemaining] = useState<RemainingRequirement[]>([]);
-  const [totalRequired, setTotalRequired] = useState(0);
-  const [totalCompleted, setTotalCompleted] = useState(0);
-  const [progressPct, setProgressPct] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [completedCourses, setCompletedCourses] = useState<string[]>([]);
+  const [coursesLoaded, setCoursesLoaded] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadDegreeProgress() {
-      setLoading(true);
-      const completedCourses = getCompletedCourses();
-      const result = await getRemainingRequirements("CS", completedCourses);
-
-      if (cancelled) return;
-
-      if (result.data) {
-        setRemaining(result.data.remaining);
-        setTotalRequired(result.data.total_credits_required);
-        setTotalCompleted(result.data.total_credits_completed);
-        setProgressPct(result.data.progress_pct);
-      }
-
-      setLoading(false);
-    }
-
-    loadDegreeProgress();
-    return () => {
-      cancelled = true;
-    };
+    setCompletedCourses(getCompletedCourses());
+    setCoursesLoaded(true);
   }, []);
 
+  const { data: degreeData, isLoading: loading } = useRemainingRequirements(
+    "CS",
+    completedCourses,
+    coursesLoaded
+  );
+
+  const remaining = degreeData?.remaining ?? [];
+  const totalRequired = degreeData?.total_credits_required ?? 0;
+  const totalCompleted = degreeData?.total_credits_completed ?? 0;
+  const progressPct = degreeData?.progress_pct ?? 0;
   const satisfiedCount = remaining.filter((r) => r.is_satisfied).length;
 
   return (

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { getProfessors } from "@/lib/api";
-import type { Professor } from "@/lib/types";
+import { useProfessors } from "@/lib/queries";
 
 type SortOption = "rating" | "difficulty" | "name";
 
@@ -26,41 +25,11 @@ function difficultyColor(difficulty: number | null): string {
 }
 
 export default function ProfessorsPage() {
-  const [professors, setProfessors] = useState<Professor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [apiStatus, setApiStatus] = useState<"connected" | "error" | "loading">("loading");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOption>("rating");
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setApiStatus("loading");
-
-      const result = await getProfessors({ department: "CSCE" });
-
-      if (cancelled) return;
-
-      if (result.error) {
-        setApiStatus("error");
-      } else {
-        setApiStatus("connected");
-      }
-
-      if (result.data) {
-        setProfessors(result.data);
-      }
-
-      setLoading(false);
-    }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: professors = [], isLoading: loading, isError } = useProfessors({ department: "CSCE" });
+  const apiStatus = loading ? "loading" : isError ? "error" : "connected";
 
   const filtered = useMemo(() => {
     let list = [...professors];

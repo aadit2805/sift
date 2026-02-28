@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getCourses } from "@/lib/api";
-import type { Course } from "@/lib/types";
+import { useCourses } from "@/lib/queries";
 
 const STORAGE_KEY = "sift_completed_courses";
 
@@ -33,23 +32,12 @@ export function CourseEditor({
   onSave: (courses: string[]) => void;
   onCancel?: () => void;
 }) {
-  const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [selected, setSelected] = useState<Set<string>>(
     new Set(initialCourses.map((c) => c.toUpperCase()))
   );
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function load() {
-      const result = await getCourses({ department: "CSCE" });
-      if (result.data) {
-        setAllCourses(result.data);
-      }
-      setLoading(false);
-    }
-    load();
-  }, []);
+  const { data: allCourses = [], isLoading: loading } = useCourses({ department: "CSCE" });
 
   const filtered = useMemo(() => {
     if (!search.trim()) return allCourses;

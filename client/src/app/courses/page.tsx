@@ -1,37 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { getCourses } from "@/lib/api";
-import type { Course } from "@/lib/types";
+import { useCourses } from "@/lib/queries";
 
 export default function CoursesPage() {
-  const [courses, setCourses] = useState<Course[]>([]);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadCourses() {
-      setLoading(true);
-      const result = await getCourses({ department: "CSCE" });
-      if (cancelled) return;
-      if (result.data) {
-        setCourses(result.data);
-      }
-      setLoading(false);
-    }
-
-    loadCourses();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: courses = [], isLoading: loading } = useCourses({ department: "CSCE" });
 
   const filteredCourses = useMemo(() => {
     if (!search.trim()) return courses;

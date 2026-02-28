@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { useTranscriptUpload } from "@/lib/queries";
 
 interface ParsedCourse {
   code: string;
@@ -10,51 +11,34 @@ interface ParsedCourse {
   grade: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
 export function TranscriptUpload({
   onCoursesExtracted,
 }: {
   onCoursesExtracted: (courses: ParsedCourse[]) => void;
 }) {
   const [dragging, setDragging] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [clientError, setClientError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mutation = useTranscriptUpload();
+
+  const loading = mutation.isPending;
+  const error = mutation.error?.message ?? clientError;
 
   const handleFile = useCallback(
-    async (file: File) => {
+    (file: File) => {
       if (file.type !== "application/pdf") {
-        setError("Please upload a PDF file");
+        setClientError("Please upload a PDF file");
         return;
       }
 
-      setLoading(true);
-      setError(null);
-
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const res = await fetch(`${API_BASE}/api/transcript/parse`, {
-          method: "POST",
-          body: formData,
-        });
-
-        const json = await res.json();
-
-        if (json.error) {
-          setError(json.error);
-        } else if (json.data?.courses) {
-          onCoursesExtracted(json.data.courses);
-        }
-      } catch {
-        setError("Failed to connect to API");
-      } finally {
-        setLoading(false);
-      }
+      setClientError(null);
+      mutation.mutate(file, {
+        onSuccess: (courses) => {
+          onCoursesExtracted(courses);
+        },
+      });
     },
-    [onCoursesExtracted]
+    [onCoursesExtracted, mutation]
   );
 
   const handleDrop = useCallback(

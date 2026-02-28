@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { getCourse } from "@/lib/api";
+import { useCourse } from "@/lib/queries";
 import type {
   Course,
   Section,
@@ -47,34 +47,8 @@ export default function CourseDetailPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const [course, setCourse] = useState<CourseDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-      const result = await getCourse(id);
-      if (cancelled) return;
-
-      if (result.error) {
-        setError(result.error);
-      }
-      if (result.data) {
-        setCourse(result.data);
-      }
-      setLoading(false);
-    }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
+  const { data: course, isLoading: loading, error: queryError } = useCourse(id);
+  const error = queryError ? queryError.message : null;
 
   // Group grade distributions by professor
   const professorGroups = useMemo(() => {
