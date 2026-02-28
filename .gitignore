@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+dist/
+out/
+build/
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env*.local
+server/.env
+
+# Supabase migrations (sensitive schema)
+supabase/migrations/
+
+# Claude Code / agents
+.claude/
+.agents/
+skills-lock.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+.turbo
+.vercel
+*.pem
+CLAUDE.md
+spec.md
