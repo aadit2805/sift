@@ -5,64 +5,41 @@ import { Badge } from "@/components/ui/badge";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { useRemainingRequirements } from "@/lib/queries";
+import { getCompletedCourses, getInProgressCourses } from "@/components/course-editor";
 import type { RemainingRequirement } from "@/lib/types";
-
-function getCompletedCourses(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = localStorage.getItem("sift_completed_courses");
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
 
 const CATEGORY_COLORS: Record<
   string,
   { bar: string; text: string; bg: string; border: string }
 > = {
-  "CS Lower Division": {
-    bar: "bg-sift-amber",
-    text: "text-sift-amber",
-    bg: "bg-sift-amber/10",
-    border: "border-sift-amber/20",
-  },
-  "CS Upper Division Required": {
-    bar: "bg-sift-blue",
-    text: "text-sift-blue",
-    bg: "bg-sift-blue/10",
-    border: "border-sift-blue/20",
-  },
-  "Senior Capstone": {
-    bar: "bg-sift-purple",
-    text: "text-sift-purple",
-    bg: "bg-sift-purple/10",
-    border: "border-sift-purple/20",
-  },
-  "CS Track Electives": {
-    bar: "bg-sift-green",
-    text: "text-sift-green",
-    bg: "bg-sift-green/10",
-    border: "border-sift-green/20",
-  },
-  Mathematics: {
-    bar: "bg-chart-3",
-    text: "text-chart-3",
-    bg: "bg-chart-3/10",
-    border: "border-chart-3/20",
-  },
-  Science: {
-    bar: "bg-chart-5",
-    text: "text-chart-5",
-    bg: "bg-chart-5/10",
-    border: "border-chart-5/20",
-  },
-  Statistics: {
-    bar: "bg-chart-2",
-    text: "text-chart-2",
-    bg: "bg-chart-2/10",
-    border: "border-chart-2/20",
-  },
+  // CS Core & Electives
+  "CS Core": { bar: "bg-sift-amber", text: "text-sift-amber", bg: "bg-sift-amber/10", border: "border-sift-amber/20" },
+  "Systems Directed Elective": { bar: "bg-sift-green", text: "text-sift-green", bg: "bg-sift-green/10", border: "border-sift-green/20" },
+  "Software Directed Elective": { bar: "bg-sift-green", text: "text-sift-green", bg: "bg-sift-green/10", border: "border-sift-green/20" },
+  "Intelligence Directed Elective": { bar: "bg-sift-green", text: "text-sift-green", bg: "bg-sift-green/10", border: "border-sift-green/20" },
+  "CSCE Tracked Electives": { bar: "bg-sift-green", text: "text-sift-green", bg: "bg-sift-green/10", border: "border-sift-green/20" },
+  "CSCE Elective": { bar: "bg-sift-green", text: "text-sift-green", bg: "bg-sift-green/10", border: "border-sift-green/20" },
+  // Math & Stats
+  Mathematics: { bar: "bg-chart-3", text: "text-chart-3", bg: "bg-chart-3/10", border: "border-chart-3/20" },
+  "MATH 304": { bar: "bg-chart-3", text: "text-chart-3", bg: "bg-chart-3/10", border: "border-chart-3/20" },
+  "Math/Stat Elective": { bar: "bg-chart-3", text: "text-chart-3", bg: "bg-chart-3/10", border: "border-chart-3/20" },
+  Statistics: { bar: "bg-chart-2", text: "text-chart-2", bg: "bg-chart-2/10", border: "border-chart-2/20" },
+  // Science
+  "Required Science": { bar: "bg-chart-5", text: "text-chart-5", bg: "bg-chart-5/10", border: "border-chart-5/20" },
+  "Science Electives": { bar: "bg-chart-5", text: "text-chart-5", bg: "bg-chart-5/10", border: "border-chart-5/20" },
+  // English, Communications, Engineering
+  English: { bar: "bg-sift-blue", text: "text-sift-blue", bg: "bg-sift-blue/10", border: "border-sift-blue/20" },
+  Communications: { bar: "bg-sift-blue", text: "text-sift-blue", bg: "bg-sift-blue/10", border: "border-sift-blue/20" },
+  "Engineering Foundations": { bar: "bg-sift-blue", text: "text-sift-blue", bg: "bg-sift-blue/10", border: "border-sift-blue/20" },
+  // University Core Curriculum
+  "American History": { bar: "bg-sift-purple", text: "text-sift-purple", bg: "bg-sift-purple/10", border: "border-sift-purple/20" },
+  Government: { bar: "bg-sift-purple", text: "text-sift-purple", bg: "bg-sift-purple/10", border: "border-sift-purple/20" },
+  "Creative Arts": { bar: "bg-sift-purple", text: "text-sift-purple", bg: "bg-sift-purple/10", border: "border-sift-purple/20" },
+  "Social & Behavioral Sciences": { bar: "bg-sift-purple", text: "text-sift-purple", bg: "bg-sift-purple/10", border: "border-sift-purple/20" },
+  "Language, Philosophy & Culture": { bar: "bg-sift-purple", text: "text-sift-purple", bg: "bg-sift-purple/10", border: "border-sift-purple/20" },
+  // Emphasis & General
+  "Emphasis Area": { bar: "bg-chart-4", text: "text-chart-4", bg: "bg-chart-4/10", border: "border-chart-4/20" },
+  "General Elective": { bar: "bg-muted-foreground", text: "text-muted-foreground", bg: "bg-muted/50", border: "border-border" },
 };
 
 function getColor(category: string) {
@@ -87,22 +64,26 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function PlanPage() {
   const [completedCourses, setCompletedCourses] = useState<string[]>([]);
+  const [inProgressCourses, setInProgressCourses] = useState<string[]>([]);
   const [coursesLoaded, setCoursesLoaded] = useState(false);
 
   useEffect(() => {
     setCompletedCourses(getCompletedCourses());
+    setInProgressCourses(getInProgressCourses());
     setCoursesLoaded(true);
   }, []);
 
   const { data: degreeData, isLoading: loading } = useRemainingRequirements(
     "CS",
     completedCourses,
+    inProgressCourses,
     coursesLoaded
   );
 
   const remaining = degreeData?.remaining ?? [];
   const totalRequired = degreeData?.total_credits_required ?? 0;
   const totalCompleted = degreeData?.total_credits_completed ?? 0;
+  const totalInProgress = degreeData?.total_credits_in_progress ?? 0;
   const progressPct = degreeData?.progress_pct ?? 0;
   const satisfiedCount = remaining.filter((r) => r.is_satisfied).length;
 
@@ -150,9 +131,17 @@ export default function PlanPage() {
                     </span>{" "}
                     credits completed
                   </span>
+                  {totalInProgress > 0 && (
+                    <span className="text-muted-foreground">
+                      <span className="font-mono text-sift-amber tabular-nums">
+                        {totalInProgress}
+                      </span>{" "}
+                      in progress
+                    </span>
+                  )}
                   <span className="text-muted-foreground">
                     <span className="font-mono text-foreground tabular-nums">
-                      {totalRequired - totalCompleted}
+                      {totalRequired - totalCompleted - totalInProgress}
                     </span>{" "}
                     credits remaining
                   </span>
@@ -171,11 +160,17 @@ export default function PlanPage() {
                 </div>
               </div>
             </div>
-            <div className="h-3 rounded-full bg-muted overflow-hidden">
+            <div className="h-3 rounded-full bg-muted overflow-hidden flex">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-sift-amber/80 to-sift-amber transition-all duration-700"
+                className="h-full bg-gradient-to-r from-sift-amber/80 to-sift-amber transition-all duration-700"
                 style={{ width: `${progressPct}%` }}
               />
+              {totalInProgress > 0 && (
+                <div
+                  className="h-full bg-sift-amber/30 transition-all duration-700"
+                  style={{ width: `${totalRequired > 0 ? Math.round((totalInProgress / totalRequired) * 100) : 0}%` }}
+                />
+              )}
             </div>
             <div className="flex justify-between mt-2 text-[10px] font-mono text-muted-foreground tabular-nums">
               <span>0 cr</span>
@@ -207,7 +202,7 @@ export default function PlanPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {remaining.map((req, i) => {
+            {remaining.filter((r) => !r.track).map((req, i) => {
               const color = getColor(req.category);
               const pct =
                 req.credits_needed > 0
@@ -239,6 +234,14 @@ export default function PlanPage() {
                       >
                         {TYPE_LABELS[req.type] || req.type}
                       </Badge>
+                      {req.selection_rule === "pick" && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground"
+                        >
+                          choose from list
+                        </Badge>
+                      )}
                       {req.is_satisfied && (
                         <Badge className="bg-sift-green/10 text-sift-green border-sift-green/20 text-[10px] px-1.5 py-0 h-4">
                           Complete
@@ -251,11 +254,17 @@ export default function PlanPage() {
                   </div>
 
                   {/* Progress bar */}
-                  <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-4">
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-4 flex">
                     <div
-                      className={`h-full rounded-full ${color.bar} transition-all duration-500`}
+                      className={`h-full ${color.bar} transition-all duration-500`}
                       style={{ width: `${pct}%` }}
                     />
+                    {(req.credits_in_progress ?? 0) > 0 && (
+                      <div
+                        className="h-full bg-sift-amber/30 transition-all duration-500"
+                        style={{ width: `${Math.min(100 - pct, Math.round(((req.credits_in_progress ?? 0) / req.credits_needed) * 100))}%` }}
+                      />
+                    )}
                   </div>
 
                   {/* Course chips */}
@@ -267,40 +276,169 @@ export default function PlanPage() {
                           Completed
                         </span>
                         <div className="flex flex-wrap gap-1.5">
-                          {req.completed_courses.map((course) => (
-                            <span
-                              key={course}
-                              className="inline-flex items-center bg-sift-green/10 text-sift-green rounded-full text-xs font-mono px-2.5 py-0.5"
-                            >
-                              {course}
-                            </span>
-                          ))}
+                          {req.completed_courses.map((course) => {
+                            const equiv = req.equivalent_matches?.[course];
+                            return (
+                              <span
+                                key={course}
+                                className="inline-flex items-center bg-sift-green/10 text-sift-green rounded-full text-xs font-mono px-2.5 py-0.5"
+                                title={equiv ? `Satisfied by ${equiv}` : undefined}
+                              >
+                                {equiv ?? course}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* In-progress courses */}
+                    {(req.in_progress_courses?.length ?? 0) > 0 && (
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground mb-1.5 block">
+                          In Progress
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {req.in_progress_courses.map((course) => {
+                            const equiv = req.equivalent_matches?.[course];
+                            return (
+                              <span
+                                key={course}
+                                className="inline-flex items-center bg-sift-amber/10 text-sift-amber rounded-full text-xs font-mono px-2.5 py-0.5"
+                                title={equiv ? `Satisfied by ${equiv}` : "In progress"}
+                              >
+                                {equiv ?? course}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
 
                     {/* Remaining courses */}
-                    {req.remaining_courses.length > 0 && (
-                      <div>
-                        <span className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                          Remaining
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {req.remaining_courses.map((course) => (
-                            <span
-                              key={course}
-                              className="inline-flex items-center bg-muted text-muted-foreground rounded-full text-xs font-mono px-2.5 py-0.5"
-                            >
-                              {course}
-                            </span>
-                          ))}
+                    {req.remaining_courses.length > 0 && (() => {
+                      const creditsStillNeeded = req.credits_needed - req.credits_completed - (req.credits_in_progress ?? 0);
+                      if (req.selection_rule === "pick" && creditsStillNeeded <= 0) return null;
+                      return (
+                        <div>
+                          <span className="text-sm font-medium text-muted-foreground mb-1.5 block">
+                            {req.selection_rule === "pick"
+                              ? `Remaining (choose ${creditsStillNeeded} more credits)`
+                              : "Remaining"}
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {req.remaining_courses.map((course) => (
+                              <span
+                                key={course}
+                                className="inline-flex items-center bg-muted text-muted-foreground rounded-full text-xs font-mono px-2.5 py-0.5"
+                              >
+                                {course}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               );
             })}
+
+            {/* CS Track Electives grouped section */}
+            {remaining.filter((r) => r.track).length > 0 && (
+              <div className="rounded-lg border border-border bg-card shadow-sm p-5">
+                <h2 className="text-sm font-semibold text-sift-green mb-4">
+                  CS Track Electives
+                </h2>
+                <div className="space-y-4">
+                  {remaining.filter((r) => r.track).map((req) => {
+                    const color = getColor(req.category);
+                    const pct =
+                      req.credits_needed > 0
+                        ? Math.min(100, Math.round((req.credits_completed / req.credits_needed) * 100))
+                        : 0;
+
+                    return (
+                      <div key={req.category} className={`rounded-md border ${color.border} ${color.bg} p-4`}>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-3">
+                            <h3 className={`text-xs font-semibold ${color.text}`}>
+                              {req.category}
+                            </h3>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1.5 py-0 h-4 border-border text-muted-foreground"
+                            >
+                              choose from list
+                            </Badge>
+                            {req.is_satisfied && (
+                              <Badge className="bg-sift-green/10 text-sift-green border-sift-green/20 text-[10px] px-1.5 py-0 h-4">
+                                Complete
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-xs tabular-nums text-muted-foreground">
+                            <span className="font-mono">{req.credits_completed}/{req.credits_needed}</span> credits
+                          </span>
+                        </div>
+
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden mb-3 flex">
+                          <div
+                            className={`h-full ${color.bar} transition-all duration-500`}
+                            style={{ width: `${pct}%` }}
+                          />
+                          {(req.credits_in_progress ?? 0) > 0 && (
+                            <div
+                              className="h-full bg-sift-amber/30 transition-all duration-500"
+                              style={{ width: `${Math.min(100 - pct, Math.round(((req.credits_in_progress ?? 0) / req.credits_needed) * 100))}%` }}
+                            />
+                          )}
+                        </div>
+
+                        {req.completed_courses.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {req.completed_courses.map((course) => (
+                              <span key={course} className="inline-flex items-center bg-sift-green/10 text-sift-green rounded-full text-xs font-mono px-2.5 py-0.5">
+                                {course}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {(req.in_progress_courses?.length ?? 0) > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {req.in_progress_courses.map((course) => (
+                              <span key={course} className="inline-flex items-center bg-sift-amber/10 text-sift-amber rounded-full text-xs font-mono px-2.5 py-0.5">
+                                {course}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {req.remaining_courses.length > 0 && (() => {
+                          const creditsStillNeeded = req.credits_needed - req.credits_completed - (req.credits_in_progress ?? 0);
+                          if (creditsStillNeeded <= 0) return null;
+                          return (
+                            <div>
+                              <span className="text-[10px] text-muted-foreground block mb-1">
+                                choose {creditsStillNeeded} more credits
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {req.remaining_courses.map((course) => (
+                                  <span key={course} className="inline-flex items-center bg-muted text-muted-foreground rounded-full text-xs font-mono px-2.5 py-0.5">
+                                    {course}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -22,27 +22,53 @@ import {
   CourseEditor,
   getCompletedCourses,
   setCompletedCourses,
+  getInProgressCourses,
+  setInProgressCourses,
 } from "@/components/course-editor";
 import { useRecommendations, useRemainingRequirements, queryKeys } from "@/lib/queries";
+
+function getNextSemester(): string {
+  const now = new Date();
+  const month = now.getMonth(); // 0-indexed
+  const year = now.getFullYear();
+  // If we're in Jan-May → planning for Fall of same year
+  // If we're in Jun-Jul → planning for Fall of same year
+  // If we're in Aug-Dec → planning for Spring of next year
+  if (month <= 6) return `Fall ${year}`;
+  return `Spring ${year + 1}`;
+}
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [semester, setSemester] = useState("Fall 2026");
-  const [weights, setWeights] = useState<Record<string, number>>({
-    weight_gpa: 0.25,
-    weight_professor: 0.2,
-    weight_difficulty: 0.15,
-    weight_requirement: 0.15,
+  const [semester, setSemester] = useState(() => {
+    if (typeof window === "undefined") return getNextSemester();
+    try {
+      const stored = localStorage.getItem("sift_semester");
+      return stored || getNextSemester();
+    } catch {
+      return getNextSemester();
+    }
+  });
+  const [weights, setWeights] = useState<Record<string, number>>(() => {
+    if (typeof window === "undefined") return { weight_gpa: 0.25, weight_professor: 0.2, weight_difficulty: 0.15, weight_requirement: 0.15 };
+    try {
+      const stored = localStorage.getItem("sift_weights");
+      return stored ? JSON.parse(stored) : { weight_gpa: 0.25, weight_professor: 0.2, weight_difficulty: 0.15, weight_requirement: 0.15 };
+    } catch {
+      return { weight_gpa: 0.25, weight_professor: 0.2, weight_difficulty: 0.15, weight_requirement: 0.15 };
+    }
   });
 
   const [completedCourses, setCompleted] = useState<string[]>([]);
+  const [inProgressCourses, setIP] = useState<string[]>([]);
   const [coursesLoaded, setCoursesLoaded] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
 
   useEffect(() => {
     setCompleted(getCompletedCourses());
+    setIP(getInProgressCourses());
     setCoursesLoaded(true);
   }, []);
 
@@ -50,23 +76,25 @@ export default function Dashboard() {
     {
       major: "CS",
       completed_courses: completedCourses,
+      in_progress_courses: inProgressCourses,
       preferences: weights,
       semester,
     },
     coursesLoaded
   );
 
-  const degreeQuery = useRemainingRequirements("CS", completedCourses, coursesLoaded);
+  const degreeQuery = useRemainingRequirements("CS", completedCourses, inProgressCourses, coursesLoaded);
 
   const courses = recsQuery.data ?? [];
   const remaining = degreeQuery.data?.remaining ?? [];
   const totalRequired = degreeQuery.data?.total_credits_required ?? 0;
   const totalCompleted = degreeQuery.data?.total_credits_completed ?? 0;
+  const totalInProgress = degreeQuery.data?.total_credits_in_progress ?? 0;
   const progressPct = degreeQuery.data?.progress_pct ?? 0;
-  const loading = recsQuery.isLoading || degreeQuery.isLoading;
+  const loading = !coursesLoaded || recsQuery.isPending || degreeQuery.isPending;
   const apiStatus: "connected" | "error" | "loading" = loading
     ? "loading"
-    : recsQuery.isError && degreeQuery.isError
+    : recsQuery.isError || degreeQuery.isError
       ? "error"
       : "connected";
 
@@ -103,8 +131,13 @@ export default function Dashboard() {
       const completed = parsed
         .filter((c) => !["W", "IP", "I"].includes(c.grade))
         .map((c) => c.code);
+      const ip = parsed
+        .filter((c) => c.grade === "IP")
+        .map((c) => c.code);
       setCompleted(completed);
       setCompletedCourses(completed);
+      setIP(ip);
+      setInProgressCourses(ip);
       setShowTranscript(false);
       queryClient.invalidateQueries({ queryKey: queryKeys.recommendations.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.degreePlan.all });
@@ -112,8 +145,9 @@ export default function Dashboard() {
     [queryClient]
   );
 
-  const handleEditorSave = useCallback((courses: string[]) => {
-    setCompleted(courses);
+  const handleEditorSave = useCallback((completed: string[], inProgress: string[]) => {
+    setCompleted(completed);
+    setIP(inProgress);
     setShowEditor(false);
     queryClient.invalidateQueries({ queryKey: queryKeys.recommendations.all });
     queryClient.invalidateQueries({ queryKey: queryKeys.degreePlan.all });
@@ -121,7 +155,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader semester={semester} onSemesterChange={setSemester} />
+      <SiteHeader semester={semester} onSemesterChange={(s) => { setSemester(s); localStorage.setItem("sift_semester", s); }} />
 
       <div className="max-w-[1440px] mx-auto px-5 py-6">
         {/* Search + stats */}
@@ -178,7 +212,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 text-sm">
               <span className="text-muted-foreground">Remaining</span>
               <span className="font-mono text-foreground tabular-nums">
-                {loading ? "-" : `${totalRequired - totalCompleted} cr`}
+                {loading ? "-" : `${totalRequired - totalCompleted - totalInProgress} cr`}
               </span>
             </div>
             <div className="h-4 w-px bg-border" />
@@ -299,7 +333,7 @@ export default function Dashboard() {
                   My Courses
                 </span>
                 <span className="text-xs text-sift-amber font-mono tabular-nums">
-                  {completedCourses.length} completed
+                  {completedCourses.length} done{inProgressCourses.length > 0 ? `, ${inProgressCourses.length} IP` : ""}
                 </span>
               </div>
 
@@ -367,6 +401,7 @@ export default function Dashboard() {
                     <div className="mt-6">
                       <CourseEditor
                         initialCourses={completedCourses}
+                        initialInProgress={inProgressCourses}
                         onSave={handleEditorSave}
                         onCancel={() => setShowEditor(false)}
                       />
@@ -382,12 +417,13 @@ export default function Dashboard() {
                 remaining={remaining}
                 totalRequired={totalRequired}
                 totalCompleted={totalCompleted}
+                totalInProgress={totalInProgress}
                 progressPct={progressPct}
               />
             </div>
 
             {/* Weights */}
-            <WeightControls weights={weights} onWeightsChange={setWeights} />
+            <WeightControls weights={weights} onWeightsChange={(w) => { setWeights(w); localStorage.setItem("sift_weights", JSON.stringify(w)); }} />
 
           </aside>
         </div>
