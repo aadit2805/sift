@@ -12,6 +12,7 @@ recommendationsRouter.post("/", async (req, res) => {
     const {
       major,
       completed_courses = [],
+      in_progress_courses = [],
       preferences = {},
       semester = "Fall 2026",
     } = req.body;
@@ -23,6 +24,13 @@ recommendationsRouter.post("/", async (req, res) => {
     const completedSet = new Set(
       (completed_courses as string[]).map((c) => c.toUpperCase().trim())
     );
+    const inProgressSet = new Set(
+      (in_progress_courses as string[]).map((c: string) => c.toUpperCase().trim())
+    );
+    // Exclude both completed and in-progress from recommendations
+    const excludedSet = new Set([...completedSet, ...inProgressSet]);
+    // Both completed and in-progress satisfy prereqs
+    const prereqSatisfiedSet = new Set([...completedSet, ...inProgressSet]);
 
     // 1. Get degree plan
     const { data: plan } = await supabase
@@ -35,12 +43,54 @@ recommendationsRouter.post("/", async (req, res) => {
 
     const requirements: DegreeRequirement[] = plan?.requirements || [];
 
-    // 2. Compute remaining requirements
+    // Build a set of all satisfied courses (completed or in-progress) including equivalents
+    const satisfiedCourses = new Set(excludedSet);
+    for (const req of requirements) {
+      if (!req.equivalents) continue;
+      for (const [canonical, equivs] of Object.entries(req.equivalents)) {
+        if (excludedSet.has(canonical.toUpperCase())) {
+          // Canonical completed/IP — mark all equivalents as satisfied too
+          for (const eq of equivs) satisfiedCourses.add(eq.toUpperCase());
+        } else {
+          // Check if any equivalent is completed/IP — mark canonical as satisfied
+          for (const eq of equivs) {
+            if (excludedSet.has(eq.toUpperCase())) {
+              satisfiedCourses.add(canonical.toUpperCase());
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Helper to get credit value for a course within a requirement
+    function getCourseCredits(code: string, req: DegreeRequirement): number {
+      return req.credits_map?.[code] ?? 3;
+    }
+
+    // 2. Compute remaining requirements (equivalency + pick-type aware)
     const remainingReqs = requirements
-      .map((req) => ({
-        ...req,
-        courses: req.courses.filter((c: string) => !completedSet.has(c.toUpperCase())),
-      }))
+      .map((req) => {
+        const selectionRule = req.selection_rule ?? "all";
+
+        // Calculate credits completed in this category
+        let creditsCompleted = 0;
+        for (const course of req.courses) {
+          if (satisfiedCourses.has(course.toUpperCase())) {
+            creditsCompleted += getCourseCredits(course, req);
+          }
+        }
+
+        // For pick-type requirements that are fully satisfied, return empty courses
+        if (selectionRule === "pick" && creditsCompleted >= req.credits_needed) {
+          return { ...req, courses: [] as string[] };
+        }
+
+        return {
+          ...req,
+          courses: req.courses.filter((c: string) => !satisfiedCourses.has(c.toUpperCase())),
+        };
+      })
       .filter((req) => req.courses.length > 0);
 
     // 3. Get all eligible courses (not completed, prereqs met)
@@ -75,12 +125,12 @@ recommendationsRouter.post("/", async (req, res) => {
       remainingKeySet.has(`${c.department} ${c.number}`.toUpperCase())
     );
 
-    // Filter by prereqs
+    // Filter by prereqs — in-progress courses satisfy prereqs for next semester
     const prereqReady = eligibleCourses.filter((course) => {
       if (!course.prereqs || course.prereqs.length === 0) return true;
       // prereqs is array of arrays (OR of AND groups)
       return course.prereqs.some((group: string[]) =>
-        group.every((prereq: string) => completedSet.has(prereq.toUpperCase()))
+        group.every((prereq: string) => prereqSatisfiedSet.has(prereq.toUpperCase()))
       );
     });
 

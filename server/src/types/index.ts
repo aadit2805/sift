@@ -53,6 +53,10 @@ export interface DegreeRequirement {
   category: string;
   courses: string[];
   credits_needed: number;
+  equivalents?: Record<string, string[]>;
+  selection_rule?: "all" | "pick";
+  track?: string;
+  credits_map?: Record<string, number>;
 }
 
 export interface DegreePlan {
