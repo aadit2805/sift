@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCourses } from "@/lib/queries";
 
 const STORAGE_KEY = "sift_completed_courses";
+const IP_STORAGE_KEY = "sift_in_progress_courses";
 
 export function getCompletedCourses(): string[] {
   if (typeof window === "undefined") return [];
@@ -23,21 +24,42 @@ export function setCompletedCourses(courses: string[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
 }
 
+export function getInProgressCourses(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(IP_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setInProgressCourses(courses: string[]) {
+  localStorage.setItem(IP_STORAGE_KEY, JSON.stringify(courses));
+}
+
+type CourseState = "none" | "completed" | "in_progress";
+
 export function CourseEditor({
   initialCourses,
+  initialInProgress = [],
   onSave,
   onCancel,
 }: {
   initialCourses: string[];
-  onSave: (courses: string[]) => void;
+  initialInProgress?: string[];
+  onSave: (completed: string[], inProgress: string[]) => void;
   onCancel?: () => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(
+  const [completed, setCompleted] = useState<Set<string>>(
     new Set(initialCourses.map((c) => c.toUpperCase()))
+  );
+  const [inProgress, setInProgress] = useState<Set<string>>(
+    new Set(initialInProgress.map((c) => c.toUpperCase()))
   );
   const [search, setSearch] = useState("");
 
-  const { data: allCourses = [], isLoading: loading } = useCourses({ department: "CSCE" });
+  const { data: allCourses = [], isLoading: loading } = useCourses();
 
   const filtered = useMemo(() => {
     if (!search.trim()) return allCourses;
@@ -49,20 +71,46 @@ export function CourseEditor({
     );
   }, [search, allCourses]);
 
+  const getState = (code: string): CourseState => {
+    if (completed.has(code)) return "completed";
+    if (inProgress.has(code)) return "in_progress";
+    return "none";
+  };
+
+  // Tri-state cycle: none → completed → in_progress → none
   const toggle = (code: string) => {
-    const next = new Set(selected);
-    if (next.has(code)) {
-      next.delete(code);
+    const state = getState(code);
+    const nextCompleted = new Set(completed);
+    const nextIP = new Set(inProgress);
+
+    if (state === "none") {
+      nextCompleted.add(code);
+    } else if (state === "completed") {
+      nextCompleted.delete(code);
+      nextIP.add(code);
     } else {
-      next.add(code);
+      nextIP.delete(code);
     }
-    setSelected(next);
+
+    setCompleted(nextCompleted);
+    setInProgress(nextIP);
+  };
+
+  const removeChip = (code: string) => {
+    const nextCompleted = new Set(completed);
+    const nextIP = new Set(inProgress);
+    nextCompleted.delete(code);
+    nextIP.delete(code);
+    setCompleted(nextCompleted);
+    setInProgress(nextIP);
   };
 
   const handleSave = () => {
-    const courses = Array.from(selected);
-    setCompletedCourses(courses);
-    onSave(courses);
+    const completedArr = Array.from(completed);
+    const ipArr = Array.from(inProgress);
+    setCompletedCourses(completedArr);
+    setInProgressCourses(ipArr);
+    onSave(completedArr, ipArr);
   };
 
   return (
@@ -70,10 +118,10 @@ export function CourseEditor({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-medium text-foreground">
-            Completed Courses
+            My Courses
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {selected.size} selected
+            {completed.size} completed, {inProgress.size} in progress
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -105,15 +153,38 @@ export function CourseEditor({
       />
 
       {/* Selected chips */}
-      {selected.size > 0 && (
+      {(completed.size > 0 || inProgress.size > 0) && (
         <div className="flex flex-wrap gap-1">
-          {Array.from(selected)
+          {Array.from(completed)
             .sort()
             .map((code) => (
               <Badge
                 key={code}
                 className="bg-sift-green/10 text-sift-green border-sift-green/15 text-[9px] font-mono px-1.5 py-0 h-5 cursor-pointer hover:bg-sift-green/20 rounded-full"
-                onClick={() => toggle(code)}
+                onClick={() => removeChip(code)}
+              >
+                {code}
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="ml-1"
+                >
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </Badge>
+            ))}
+          {Array.from(inProgress)
+            .sort()
+            .map((code) => (
+              <Badge
+                key={code}
+                className="bg-sift-amber/10 text-sift-amber border-sift-amber/15 text-[9px] font-mono px-1.5 py-0 h-5 cursor-pointer hover:bg-sift-amber/20 rounded-full"
+                onClick={() => removeChip(code)}
               >
                 {code}
                 <svg
@@ -133,6 +204,22 @@ export function CourseEditor({
         </div>
       )}
 
+      {/* Legend */}
+      <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded border border-border" />
+          Not taken
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-sift-green border-sift-green" />
+          Completed
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-sift-amber border-sift-amber" />
+          In Progress
+        </span>
+      </div>
+
       {/* Course list */}
       <ScrollArea className="h-64 border border-border rounded-lg">
         {loading ? (
@@ -145,27 +232,29 @@ export function CourseEditor({
           <div className="p-1">
             {filtered.map((course) => {
               const code = `${course.department} ${course.number}`;
-              const isSelected = selected.has(code);
+              const state = getState(code);
               return (
                 <button
                   key={course.id}
                   onClick={() => toggle(code)}
                   className={`
                     w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors
-                    ${isSelected ? "bg-sift-green/6" : "hover:bg-accent/50"}
+                    ${state === "completed" ? "bg-sift-green/6" : state === "in_progress" ? "bg-sift-amber/6" : "hover:bg-accent/50"}
                   `}
                 >
                   <div
                     className={`
                       w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors
                       ${
-                        isSelected
+                        state === "completed"
                           ? "bg-sift-green border-sift-green"
-                          : "border-border"
+                          : state === "in_progress"
+                            ? "bg-sift-amber border-sift-amber"
+                            : "border-border"
                       }
                     `}
                   >
-                    {isSelected && (
+                    {state === "completed" && (
                       <svg
                         width="10"
                         height="10"
@@ -175,6 +264,18 @@ export function CourseEditor({
                         strokeWidth="3"
                       >
                         <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                    {state === "in_progress" && (
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="3"
+                      >
+                        <circle cx="12" cy="12" r="4" fill="white" />
                       </svg>
                     )}
                   </div>

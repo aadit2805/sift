@@ -10,7 +10,29 @@ const NAV_ITEMS = [
   { href: "/plan", label: "Plan" },
 ];
 
-const SEMESTERS = ["Fall 2026", "Spring 2027", "Summer 2027", "Fall 2027"];
+function getSemesterOptions(): string[] {
+  const now = new Date();
+  const month = now.getMonth();
+  const year = now.getFullYear();
+  // Generate 4 upcoming semesters starting from the next one
+  const semesters: string[] = [];
+  let startSeason: "Spring" | "Summer" | "Fall" = month <= 4 ? "Fall" : month <= 6 ? "Fall" : "Spring";
+  let startYear = startSeason === "Spring" ? year + 1 : year;
+  const order: ("Spring" | "Summer" | "Fall")[] = ["Spring", "Summer", "Fall"];
+  let idx = order.indexOf(startSeason);
+  let y = startYear;
+  for (let i = 0; i < 4; i++) {
+    semesters.push(`${order[idx]} ${y}`);
+    idx++;
+    if (idx >= order.length) {
+      idx = 0;
+      y++;
+    }
+  }
+  return semesters;
+}
+
+const SEMESTERS = getSemesterOptions();
 
 export function SiteHeader({
   semester,
