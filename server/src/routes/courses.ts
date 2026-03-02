@@ -3,6 +3,13 @@ import { supabase } from "../db/supabase.js";
 
 export const coursesRouter = Router();
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Escape characters that have special meaning in PostgREST filter strings
+function escapePostgrestValue(str: string): string {
+  return str.replace(/[%_\\,.*()]/g, "");
+}
+
 // GET /api/courses - list courses with optional filters
 coursesRouter.get("/", async (req, res) => {
   try {
@@ -15,9 +22,12 @@ coursesRouter.get("/", async (req, res) => {
     }
 
     if (search && typeof search === "string") {
-      query = query.or(
-        `name.ilike.%${search}%,department.ilike.%${search}%,number.ilike.%${search}%`
-      );
+      const safe = escapePostgrestValue(search);
+      if (safe.length > 0) {
+        query = query.or(
+          `name.ilike.%${safe}%,department.ilike.%${safe}%,number.ilike.%${safe}%`
+        );
+      }
     }
 
     if (semester && typeof semester === "string") {
@@ -27,12 +37,14 @@ coursesRouter.get("/", async (req, res) => {
     const { data, error } = await query.order("department").order("number");
 
     if (error) {
-      res.status(500).json({ data: null, error: error.message });
+      console.error("Courses query error:", error);
+      res.status(500).json({ data: null, error: "Failed to fetch courses" });
       return;
     }
 
     res.json({ data, error: null });
   } catch (err) {
+    console.error("Courses error:", err);
     res.status(500).json({ data: null, error: "Internal server error" });
   }
 });
@@ -41,6 +53,11 @@ coursesRouter.get("/", async (req, res) => {
 coursesRouter.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!UUID_RE.test(id)) {
+      res.status(400).json({ data: null, error: "Invalid ID format" });
+      return;
+    }
 
     const [courseResult, sectionsResult, gradesResult] = await Promise.all([
       supabase.from("courses").select("*").eq("id", id).single(),
@@ -62,6 +79,7 @@ coursesRouter.get("/:id", async (req, res) => {
       error: null,
     });
   } catch (err) {
+    console.error("Course detail error:", err);
     res.status(500).json({ data: null, error: "Internal server error" });
   }
 });

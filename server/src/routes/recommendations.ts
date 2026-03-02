@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { supabase } from "../db/supabase.js";
 import { scoreCourse, rankCourses } from "../services/scoring.js";
 import type { UserPreferences, DegreeRequirement } from "../types/index.js";
@@ -6,16 +7,30 @@ import { DEFAULT_PREFERENCES } from "../types/index.js";
 
 export const recommendationsRouter = Router();
 
+const RecommendationsSchema = z.object({
+  major: z.string().max(10).optional(),
+  completed_courses: z.array(z.string().max(20)).max(200).default([]),
+  in_progress_courses: z.array(z.string().max(20)).max(50).default([]),
+  preferences: z.record(z.number().min(0).max(1)).optional().default({}),
+  semester: z.string().max(20).default("Fall 2026"),
+});
+
 // POST /api/recommendations - get personalized course recommendations
 recommendationsRouter.post("/", async (req, res) => {
   try {
+    const parsed = RecommendationsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ data: null, error: "Invalid request body" });
+      return;
+    }
+
     const {
       major,
-      completed_courses = [],
-      in_progress_courses = [],
-      preferences = {},
-      semester = "Fall 2026",
-    } = req.body;
+      completed_courses,
+      in_progress_courses,
+      preferences,
+      semester,
+    } = parsed.data;
 
     // Parse season from semester for filtering (e.g. "Fall 2026" → "Fall")
     const season = semester.split(" ")[0];

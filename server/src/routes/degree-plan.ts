@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { supabase } from "../db/supabase.js";
 
 export const degreePlanRouter = Router();
@@ -6,7 +7,11 @@ export const degreePlanRouter = Router();
 // GET /api/degree-plan/:major - get degree plan for a major
 degreePlanRouter.get("/:major", async (req, res) => {
   try {
-    const { major } = req.params;
+    const major = req.params.major?.slice(0, 10);
+    if (!major || !/^[A-Za-z]+$/.test(major)) {
+      res.status(400).json({ data: null, error: "Invalid major" });
+      return;
+    }
     const { catalog_year } = req.query;
 
     let query = supabase
@@ -21,7 +26,7 @@ degreePlanRouter.get("/:major", async (req, res) => {
     const { data, error } = await query.order("catalog_year", { ascending: false }).limit(1).single();
 
     if (error) {
-      res.status(404).json({ data: null, error: `No degree plan found for ${major}` });
+      res.status(404).json({ data: null, error: "No degree plan found" });
       return;
     }
 
@@ -31,15 +36,22 @@ degreePlanRouter.get("/:major", async (req, res) => {
   }
 });
 
+const RemainingSchema = z.object({
+  major: z.string().max(10),
+  completed_courses: z.array(z.string().max(20)).max(200),
+  in_progress_courses: z.array(z.string().max(20)).max(50).default([]),
+});
+
 // POST /api/degree-plan/remaining - compute remaining requirements
 degreePlanRouter.post("/remaining", async (req, res) => {
   try {
-    const { major, completed_courses, in_progress_courses = [] } = req.body;
-
-    if (!major || !Array.isArray(completed_courses)) {
-      res.status(400).json({ data: null, error: "major and completed_courses required" });
+    const parsed = RemainingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ data: null, error: "Invalid request: major and completed_courses required" });
       return;
     }
+
+    const { major, completed_courses, in_progress_courses } = parsed.data;
 
     // Get the degree plan
     const { data: plan, error: planError } = await supabase
@@ -51,7 +63,7 @@ degreePlanRouter.post("/remaining", async (req, res) => {
       .single();
 
     if (planError || !plan) {
-      res.status(404).json({ data: null, error: `No degree plan found for ${major}` });
+      res.status(404).json({ data: null, error: "No degree plan found" });
       return;
     }
 
