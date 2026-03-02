@@ -1,6 +1,6 @@
 # Sift
 
-AI-powered course planning for Texas A&M students. Sift combines grade distributions, professor ratings, prerequisite chains, and transcript data to generate personalized course recommendations.
+Course course planning for Texas A&M CSCE students. Sift combines grade distributions, professor ratings, prerequisite chains, and transcript data to generate personalized course recommendations.
 
 ## Tech Stack
 
