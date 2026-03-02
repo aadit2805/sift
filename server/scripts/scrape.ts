@@ -1,4 +1,5 @@
 import "dotenv/config";
+import https from "https";
 import { createClient } from "@supabase/supabase-js";
 
 // ============================================================
@@ -17,9 +18,12 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const ANEX_URL = "https://anex.us/grades/getData/";
 const RMP_URL = "https://www.ratemyprofessors.com/graphql";
-const RMP_AUTH = "Basic dGVzdDp0ZXN0";
+const RMP_AUTH = process.env.RMP_AUTH_TOKEN || "Basic dGVzdDp0ZXN0";
 const TAMU_SCHOOL_ID = "U2Nob29sLTEwMDM=";
 const CS_DEPT_ID = "RGVwYXJ0bWVudC0xMQ==";
+
+// TLS-tolerant agent for Anex only (their cert has issues)
+const anexAgent = new https.Agent({ rejectUnauthorized: false });
 
 // All CSCE course numbers with data on Anex
 const CSCE_COURSES = [
@@ -693,20 +697,39 @@ function formatSemester(semester: string, year: string): string {
 // ============================================================
 
 async function fetchAnex(dept: string, num: string): Promise<AnexRecord[]> {
-  const body = new URLSearchParams({ dept, number: num });
-  const res = await fetch(ANEX_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
+  const body = new URLSearchParams({ dept, number: num }).toString();
+  const url = new URL(ANEX_URL);
 
-  const text = await res.text();
-  try {
-    const data = JSON.parse(text);
-    return data.classes || [];
-  } catch {
-    return [];
-  }
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        path: url.pathname,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": Buffer.byteLength(body),
+        },
+        agent: anexAgent, // TLS bypass scoped to Anex only
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; });
+        res.on("end", () => {
+          try {
+            const parsed = JSON.parse(data);
+            resolve(parsed.classes || []);
+          } catch {
+            resolve([]);
+          }
+        });
+      }
+    );
+
+    req.on("error", () => resolve([]));
+    req.write(body);
+    req.end();
+  });
 }
 
 async function scrapeAllAnex(): Promise<AnexRecord[]> {
