@@ -53,6 +53,10 @@ export interface DegreeRequirement {
   category: string;
   courses: string[];
   credits_needed: number;
+  equivalents?: Record<string, string[]>;
+  selection_rule?: "all" | "pick";
+  track?: string;
+  credits_map?: Record<string, number>;
 }
 
 export interface DegreePlan {
@@ -98,8 +102,11 @@ export interface UserPreferences {
 export interface RemainingRequirement extends DegreeRequirement {
   remaining_courses: string[];
   completed_courses: string[];
+  in_progress_courses: string[];
   credits_completed: number;
+  credits_in_progress: number;
   is_satisfied: boolean;
+  equivalent_matches?: Record<string, string>;
 }
 
 export interface DegreeProgress {
@@ -107,6 +114,7 @@ export interface DegreeProgress {
   remaining: RemainingRequirement[];
   total_credits_required: number;
   total_credits_completed: number;
+  total_credits_in_progress: number;
   progress_pct: number;
 }
 

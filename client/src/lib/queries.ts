@@ -34,6 +34,7 @@ export const queryKeys = {
     list: (params: {
       major?: string;
       completed_courses: string[];
+      in_progress_courses?: string[];
       preferences?: Partial<UserPreferences>;
       semester?: string;
     }) => ["recommendations", "list", params] as const,
@@ -41,8 +42,8 @@ export const queryKeys = {
   degreePlan: {
     all: ["degreePlan"] as const,
     detail: (major: string) => ["degreePlan", "detail", major] as const,
-    remaining: (major: string, courses: string[]) =>
-      ["degreePlan", "remaining", major, courses] as const,
+    remaining: (major: string, courses: string[], inProgress: string[] = []) =>
+      ["degreePlan", "remaining", major, courses, inProgress] as const,
   },
 };
 
@@ -97,6 +98,7 @@ export function useProfessor(id: string) {
 export function useRecommendations(params: {
   major?: string;
   completed_courses: string[];
+  in_progress_courses?: string[];
   preferences?: Partial<UserPreferences>;
   semester?: string;
 }, enabled = true) {
@@ -117,11 +119,12 @@ export function useDegreePlan(major: string) {
 export function useRemainingRequirements(
   major: string,
   completedCourses: string[],
+  inProgressCourses: string[] = [],
   enabled = true
 ) {
   return useQuery({
-    queryKey: queryKeys.degreePlan.remaining(major, completedCourses),
-    queryFn: () => getRemainingRequirements(major, completedCourses).then(unwrap),
+    queryKey: queryKeys.degreePlan.remaining(major, completedCourses, inProgressCourses),
+    queryFn: () => getRemainingRequirements(major, completedCourses, inProgressCourses).then(unwrap),
     enabled,
   });
 }

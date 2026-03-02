@@ -51,6 +51,7 @@ export async function getCourse(id: string) {
 export async function getRecommendations(params: {
   major?: string;
   completed_courses: string[];
+  in_progress_courses?: string[];
   preferences?: Partial<UserPreferences>;
   semester?: string;
 }) {
@@ -91,13 +92,15 @@ export async function getDegreePlan(major: string) {
 
 export async function getRemainingRequirements(
   major: string,
-  completedCourses: string[]
+  completedCourses: string[],
+  inProgressCourses: string[] = []
 ) {
   return fetcher<DegreeProgress>("/api/degree-plan/remaining", {
     method: "POST",
     body: JSON.stringify({
       major,
       completed_courses: completedCourses,
+      in_progress_courses: inProgressCourses,
     }),
   });
 }
