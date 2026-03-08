@@ -3,6 +3,7 @@ import multer from "multer";
 import Anthropic from "@anthropic-ai/sdk";
 
 import { PDFParse } from "pdf-parse";
+import { requireAuth } from "../middleware/auth.js";
 
 export const transcriptRouter = Router();
 
@@ -32,7 +33,7 @@ const COURSE_CODE_RE = /^[A-Z]{2,5} \d{3}[A-Z]?$/;
 const VALID_GRADES = new Set(["A", "B", "C", "D", "F", "W", "IP", "I", "S", "U", "Q", "CR", "NC"]);
 
 // POST /api/transcript/parse - upload a transcript PDF and extract courses
-transcriptRouter.post("/parse", upload.single("file"), async (req, res) => {
+transcriptRouter.post("/parse", requireAuth, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       res.status(400).json({ data: null, error: "No file uploaded" });

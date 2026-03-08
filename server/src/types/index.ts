@@ -68,11 +68,14 @@ export interface DegreePlan {
 
 export interface UserProfile {
   id: string;
+  clerk_id: string;
   email: string;
   major: string;
   catalog_year: string;
   completed_courses: string[];
+  in_progress_courses: string[];
   preferences: UserPreferences;
+  semester: string | null;
 }
 
 export interface UserPreferences {

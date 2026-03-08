@@ -3,11 +3,13 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { clerkMiddleware } from "@clerk/express";
 import { coursesRouter } from "./routes/courses.js";
 import { recommendationsRouter } from "./routes/recommendations.js";
 import { professorsRouter } from "./routes/professors.js";
 import { degreePlanRouter } from "./routes/degree-plan.js";
 import { transcriptRouter } from "./routes/transcript.js";
+import { userRouter } from "./routes/user.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -21,6 +23,9 @@ if (allowedOrigin === "*") {
   console.warn("WARNING: FRONTEND_URL is set to '*'. This is insecure in production.");
 }
 app.use(cors({ origin: allowedOrigin }));
+
+// Clerk auth — populates auth on every request
+app.use(clerkMiddleware());
 
 // Body parsing with reasonable limit
 app.use(express.json({ limit: "256kb" }));
@@ -54,6 +59,7 @@ app.use("/api/recommendations", recommendationsRouter);
 app.use("/api/professors", professorsRouter);
 app.use("/api/degree-plan", degreePlanRouter);
 app.use("/api/transcript", transcriptRouter);
+app.use("/api/user", userRouter);
 
 app.listen(PORT, () => {
   console.log(`Sift API running on port ${PORT}`);
