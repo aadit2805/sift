@@ -4,7 +4,9 @@ import type {
   Professor,
   DegreeProgress,
   UserPreferences,
+  UserProfile,
 } from "./types";
+import { getToken } from "./auth-token";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -13,9 +15,18 @@ async function fetcher<T>(
   options?: RequestInit
 ): Promise<{ data: T | null; error: string | null }> {
   try {
+    const token = await getToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(options?.headers as Record<string, string>),
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const res = await fetch(`${API_BASE}${path}`, {
-      headers: { "Content-Type": "application/json" },
       ...options,
+      headers,
     });
     const json = await res.json();
     return json;
@@ -102,5 +113,30 @@ export async function getRemainingRequirements(
       completed_courses: completedCourses,
       in_progress_courses: inProgressCourses,
     }),
+  });
+}
+
+// --- User profile API ---
+
+export async function getUserProfile() {
+  return fetcher<UserProfile>("/api/user/profile");
+}
+
+export async function updateUserProfile(data: Partial<UserProfile>) {
+  return fetcher<UserProfile>("/api/user/profile", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function migrateLocalData(data: {
+  completed_courses?: string[];
+  in_progress_courses?: string[];
+  preferences?: Record<string, unknown>;
+  semester?: string;
+}) {
+  return fetcher<UserProfile>("/api/user/profile/migrate", {
+    method: "POST",
+    body: JSON.stringify(data),
   });
 }

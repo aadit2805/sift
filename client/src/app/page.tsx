@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,22 +18,21 @@ import { WeightControls } from "@/components/weight-controls";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TranscriptUpload } from "@/components/transcript-upload";
+import { CourseEditor } from "@/components/course-editor";
 import {
-  CourseEditor,
-  getCompletedCourses,
-  setCompletedCourses,
-  getInProgressCourses,
-  setInProgressCourses,
-} from "@/components/course-editor";
-import { useRecommendations, useRemainingRequirements, queryKeys } from "@/lib/queries";
+  useRecommendations,
+  useRemainingRequirements,
+  useUserProfile,
+  useUpdateProfile,
+  queryKeys,
+} from "@/lib/queries";
+import { useMigrateLocalData } from "@/hooks/use-migrate-local-data";
+import { DEFAULT_PREFERENCES } from "@/lib/types";
 
 function getNextSemester(): string {
   const now = new Date();
   const month = now.getMonth(); // 0-indexed
   const year = now.getFullYear();
-  // If we're in Jan-May → planning for Fall of same year
-  // If we're in Jun-Jul → planning for Fall of same year
-  // If we're in Aug-Dec → planning for Spring of next year
   if (month <= 6) return `Fall ${year}`;
   return `Spring ${year + 1}`;
 }
@@ -41,36 +40,27 @@ function getNextSemester(): string {
 export default function Dashboard() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [semester, setSemester] = useState(() => {
-    if (typeof window === "undefined") return getNextSemester();
-    try {
-      const stored = localStorage.getItem("sift_semester");
-      return stored || getNextSemester();
-    } catch {
-      return getNextSemester();
-    }
-  });
-  const [weights, setWeights] = useState<Record<string, number>>(() => {
-    if (typeof window === "undefined") return { weight_gpa: 0.25, weight_professor: 0.2, weight_difficulty: 0.15, weight_requirement: 0.15 };
-    try {
-      const stored = localStorage.getItem("sift_weights");
-      return stored ? JSON.parse(stored) : { weight_gpa: 0.25, weight_professor: 0.2, weight_difficulty: 0.15, weight_requirement: 0.15 };
-    } catch {
-      return { weight_gpa: 0.25, weight_professor: 0.2, weight_difficulty: 0.15, weight_requirement: 0.15 };
-    }
-  });
-
-  const [completedCourses, setCompleted] = useState<string[]>([]);
-  const [inProgressCourses, setIP] = useState<string[]>([]);
-  const [coursesLoaded, setCoursesLoaded] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
 
-  useEffect(() => {
-    setCompleted(getCompletedCourses());
-    setIP(getInProgressCourses());
-    setCoursesLoaded(true);
-  }, []);
+  // Migrate localStorage data on first sign-in
+  useMigrateLocalData();
+
+  // Load user profile from DB
+  const { data: profile, isPending: profileLoading } = useUserProfile();
+  const updateProfile = useUpdateProfile();
+
+  // Derive state from profile
+  const completedCourses = profile?.completed_courses ?? [];
+  const inProgressCourses = profile?.in_progress_courses ?? [];
+  const semester = profile?.semester ?? getNextSemester();
+  const weights = (profile?.preferences as Record<string, number> | undefined) ?? {
+    weight_gpa: DEFAULT_PREFERENCES.weight_gpa,
+    weight_professor: DEFAULT_PREFERENCES.weight_professor,
+    weight_difficulty: DEFAULT_PREFERENCES.weight_difficulty,
+    weight_requirement: DEFAULT_PREFERENCES.weight_requirement,
+  };
+  const profileReady = !!profile;
 
   const recsQuery = useRecommendations(
     {
@@ -80,10 +70,10 @@ export default function Dashboard() {
       preferences: weights,
       semester,
     },
-    coursesLoaded
+    profileReady
   );
 
-  const degreeQuery = useRemainingRequirements("CS", completedCourses, inProgressCourses, coursesLoaded);
+  const degreeQuery = useRemainingRequirements("CS", completedCourses, inProgressCourses, profileReady);
 
   const courses = recsQuery.data ?? [];
   const remaining = degreeQuery.data?.remaining ?? [];
@@ -91,7 +81,7 @@ export default function Dashboard() {
   const totalCompleted = degreeQuery.data?.total_credits_completed ?? 0;
   const totalInProgress = degreeQuery.data?.total_credits_in_progress ?? 0;
   const progressPct = degreeQuery.data?.progress_pct ?? 0;
-  const loading = !coursesLoaded || recsQuery.isPending || degreeQuery.isPending;
+  const loading = profileLoading || recsQuery.isPending || degreeQuery.isPending;
   const apiStatus: "connected" | "error" | "loading" = loading
     ? "loading"
     : recsQuery.isError || degreeQuery.isError
@@ -126,6 +116,18 @@ export default function Dashboard() {
     return filtered.sort((a, b) => b.score - a.score);
   }, [search, courses]);
 
+  const handleSemesterChange = useCallback((s: string) => {
+    updateProfile.mutate({ semester: s } as Record<string, unknown>, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.recommendations.all });
+      },
+    });
+  }, [updateProfile, queryClient]);
+
+  const handleWeightsChange = useCallback((w: Record<string, number>) => {
+    updateProfile.mutate({ preferences: w } as Record<string, unknown>);
+  }, [updateProfile]);
+
   const handleTranscriptCourses = useCallback(
     (parsed: { code: string; name: string; credits: number; grade: string }[]) => {
       const completed = parsed
@@ -134,28 +136,37 @@ export default function Dashboard() {
       const ip = parsed
         .filter((c) => c.grade === "IP")
         .map((c) => c.code);
-      setCompleted(completed);
-      setCompletedCourses(completed);
-      setIP(ip);
-      setInProgressCourses(ip);
-      setShowTranscript(false);
-      queryClient.invalidateQueries({ queryKey: queryKeys.recommendations.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.degreePlan.all });
+
+      updateProfile.mutate(
+        { completed_courses: completed, in_progress_courses: ip } as Record<string, unknown>,
+        {
+          onSuccess: () => {
+            setShowTranscript(false);
+            queryClient.invalidateQueries({ queryKey: queryKeys.recommendations.all });
+            queryClient.invalidateQueries({ queryKey: queryKeys.degreePlan.all });
+          },
+        }
+      );
     },
-    [queryClient]
+    [updateProfile, queryClient]
   );
 
   const handleEditorSave = useCallback((completed: string[], inProgress: string[]) => {
-    setCompleted(completed);
-    setIP(inProgress);
-    setShowEditor(false);
-    queryClient.invalidateQueries({ queryKey: queryKeys.recommendations.all });
-    queryClient.invalidateQueries({ queryKey: queryKeys.degreePlan.all });
-  }, [queryClient]);
+    updateProfile.mutate(
+      { completed_courses: completed, in_progress_courses: inProgress } as Record<string, unknown>,
+      {
+        onSuccess: () => {
+          setShowEditor(false);
+          queryClient.invalidateQueries({ queryKey: queryKeys.recommendations.all });
+          queryClient.invalidateQueries({ queryKey: queryKeys.degreePlan.all });
+        },
+      }
+    );
+  }, [updateProfile, queryClient]);
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader semester={semester} onSemesterChange={(s) => { setSemester(s); localStorage.setItem("sift_semester", s); }} />
+      <SiteHeader semester={semester} onSemesterChange={handleSemesterChange} />
 
       <div className="max-w-[1440px] mx-auto px-5 py-6">
         {/* Search + stats */}
@@ -423,7 +434,7 @@ export default function Dashboard() {
             </div>
 
             {/* Weights */}
-            <WeightControls weights={weights} onWeightsChange={(w) => { setWeights(w); localStorage.setItem("sift_weights", JSON.stringify(w)); }} />
+            <WeightControls weights={weights} onWeightsChange={handleWeightsChange} />
 
           </aside>
         </div>

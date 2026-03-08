@@ -99,6 +99,18 @@ export interface UserPreferences {
   excluded_courses: string[];
 }
 
+export interface UserProfile {
+  id: string;
+  clerk_id: string;
+  email: string;
+  major: string;
+  catalog_year: string;
+  completed_courses: string[];
+  in_progress_courses: string[];
+  preferences: UserPreferences;
+  semester: string | null;
+}
+
 export interface RemainingRequirement extends DegreeRequirement {
   remaining_courses: string[];
   completed_courses: string[];

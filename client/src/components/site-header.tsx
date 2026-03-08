@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard" },
@@ -108,11 +109,16 @@ export function SiteHeader({
           )}
 
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-sift-amber flex items-center justify-center">
-              <span className="text-[10px] font-bold text-primary-foreground">
-                CS
-              </span>
-            </div>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className="text-sm px-3 py-1.5 rounded-md bg-sift-amber text-primary-foreground hover:bg-sift-amber/90 transition-colors font-medium">
+                  Sign in
+                </button>
+              </SignInButton>
+            </SignedOut>
           </div>
         </div>
       </div>

@@ -11,8 +11,11 @@ import {
   getRecommendations,
   getDegreePlan,
   getRemainingRequirements,
+  getUserProfile,
+  updateUserProfile,
 } from "./api";
-import type { UserPreferences } from "./types";
+import type { UserPreferences, UserProfile } from "./types";
+import { getToken } from "./auth-token";
 
 // --- Query key factory ---
 
@@ -44,6 +47,10 @@ export const queryKeys = {
     detail: (major: string) => ["degreePlan", "detail", major] as const,
     remaining: (major: string, courses: string[], inProgress: string[] = []) =>
       ["degreePlan", "remaining", major, courses, inProgress] as const,
+  },
+  user: {
+    all: ["user"] as const,
+    profile: ["user", "profile"] as const,
   },
 };
 
@@ -129,6 +136,27 @@ export function useRemainingRequirements(
   });
 }
 
+// --- User profile hooks ---
+
+export function useUserProfile(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.user.profile,
+    queryFn: () => getUserProfile().then(unwrap),
+    enabled,
+  });
+}
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: Partial<UserProfile>) => updateUserProfile(data).then(unwrap),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.user.profile });
+    },
+  });
+}
+
 // --- Mutation hooks ---
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -141,8 +169,15 @@ export function useTranscriptUpload() {
       const formData = new FormData();
       formData.append("file", file);
 
+      const token = await getToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`${API_BASE}/api/transcript/parse`, {
         method: "POST",
+        headers,
         body: formData,
       });
 

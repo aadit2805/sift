@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { useRemainingRequirements } from "@/lib/queries";
-import { getCompletedCourses, getInProgressCourses } from "@/components/course-editor";
+import { useRemainingRequirements, useUserProfile } from "@/lib/queries";
 import type { RemainingRequirement } from "@/lib/types";
 
 const CATEGORY_COLORS: Record<
@@ -63,22 +61,19 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function PlanPage() {
-  const [completedCourses, setCompletedCourses] = useState<string[]>([]);
-  const [inProgressCourses, setInProgressCourses] = useState<string[]>([]);
-  const [coursesLoaded, setCoursesLoaded] = useState(false);
+  const { data: profile, isPending: profileLoading } = useUserProfile();
 
-  useEffect(() => {
-    setCompletedCourses(getCompletedCourses());
-    setInProgressCourses(getInProgressCourses());
-    setCoursesLoaded(true);
-  }, []);
+  const completedCourses = profile?.completed_courses ?? [];
+  const inProgressCourses = profile?.in_progress_courses ?? [];
 
-  const { data: degreeData, isLoading: loading } = useRemainingRequirements(
+  const { data: degreeData, isLoading: degreeLoading } = useRemainingRequirements(
     "CS",
     completedCourses,
     inProgressCourses,
-    coursesLoaded
+    !!profile
   );
+
+  const loading = profileLoading || degreeLoading;
 
   const remaining = degreeData?.remaining ?? [];
   const totalRequired = degreeData?.total_credits_required ?? 0;

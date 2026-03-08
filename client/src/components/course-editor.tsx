@@ -7,37 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCourses } from "@/lib/queries";
 
-const STORAGE_KEY = "sift_completed_courses";
-const IP_STORAGE_KEY = "sift_in_progress_courses";
-
-export function getCompletedCourses(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function setCompletedCourses(courses: string[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(courses));
-}
-
-export function getInProgressCourses(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = localStorage.getItem(IP_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function setInProgressCourses(courses: string[]) {
-  localStorage.setItem(IP_STORAGE_KEY, JSON.stringify(courses));
-}
-
 type CourseState = "none" | "completed" | "in_progress";
 
 export function CourseEditor({
@@ -106,11 +75,7 @@ export function CourseEditor({
   };
 
   const handleSave = () => {
-    const completedArr = Array.from(completed);
-    const ipArr = Array.from(inProgress);
-    setCompletedCourses(completedArr);
-    setInProgressCourses(ipArr);
-    onSave(completedArr, ipArr);
+    onSave(Array.from(completed), Array.from(inProgress));
   };
 
   return (
