@@ -135,9 +135,11 @@ export default function ProfessorDetailPage() {
           <LoadingSkeleton />
         ) : error ? (
           <div className="text-center py-16 border border-sift-red/20 bg-sift-red/5 rounded-lg">
-            <p className="text-sift-red text-sm font-medium mb-2">{error}</p>
+            <p className="text-sift-red text-sm font-medium mb-2">
+              Unable to load professor
+            </p>
             <p className="text-muted-foreground text-xs">
-              Could not load professor data. Make sure the API is running.
+              Something went wrong. Please try again in a moment.
             </p>
           </div>
         ) : professor ? (

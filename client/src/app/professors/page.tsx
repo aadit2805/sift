@@ -29,7 +29,7 @@ export default function ProfessorsPage() {
   const [sort, setSort] = useState<SortOption>("rating");
 
   const { data: professors = [], isLoading: loading, isError } = useProfessors({ department: "CSCE" });
-  const apiStatus = loading ? "loading" : isError ? "error" : "connected";
+  const hasError = !loading && isError;
 
   const filtered = useMemo(() => {
     let list = [...professors];
@@ -170,13 +170,13 @@ export default function ProfessorsPage() {
               </div>
             ))}
           </div>
-        ) : apiStatus === "error" && professors.length === 0 ? (
+        ) : hasError && professors.length === 0 ? (
           <div className="text-center py-16 border border-sift-red/20 bg-sift-red/5 rounded-lg">
             <p className="text-sift-red text-sm font-medium mb-2">
-              Failed to connect to API
+              Unable to load professors
             </p>
             <p className="text-muted-foreground text-xs">
-              Make sure the backend is running on port 3001
+              We&apos;re having trouble reaching our servers. Please try again in a moment.
             </p>
           </div>
         ) : (
@@ -281,7 +281,7 @@ export default function ProfessorsPage() {
         )}
       </div>
 
-      <SiteFooter apiStatus={apiStatus} />
+      <SiteFooter />
     </div>
   );
 }
