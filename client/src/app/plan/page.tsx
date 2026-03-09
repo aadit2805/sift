@@ -441,10 +441,10 @@ export default function PlanPage() {
         {!loading && remaining.length === 0 && (
           <div className="text-center py-16 border border-border bg-card shadow-sm rounded-lg">
             <p className="text-muted-foreground text-sm mb-2">
-              No degree plan data available
+              No degree requirements found
             </p>
             <p className="text-xs text-muted-foreground">
-              Make sure the backend is running on port 3001
+              Upload your transcript or add completed courses from the dashboard to see your degree progress.
             </p>
           </div>
         )}

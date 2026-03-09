@@ -120,9 +120,11 @@ export default function CourseDetailPage() {
         ) : error && !course ? (
           <div className="text-center py-16 bg-card shadow-sm border border-border rounded-lg">
             <p className="text-sift-red text-sm font-medium mb-2">
-              Failed to load course
+              Unable to load course
             </p>
-            <p className="text-muted-foreground text-xs">{error}</p>
+            <p className="text-muted-foreground text-xs">
+              Something went wrong. Please try again in a moment.
+            </p>
           </div>
         ) : course ? (
           <>

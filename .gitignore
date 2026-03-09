@@ -43,3 +43,6 @@ Thumbs.db
 *.pem
 CLAUDE.md
 spec.md
+
+# Scripts (one-off data utilities)
+server/scripts/

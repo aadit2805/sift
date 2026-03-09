@@ -22,7 +22,7 @@ export function TranscriptUpload({
   const mutation = useTranscriptUpload();
 
   const loading = mutation.isPending;
-  const error = mutation.error?.message ?? clientError;
+  const error = clientError ?? (mutation.error ? "Something went wrong while parsing your transcript. Please try again." : null);
 
   const handleFile = useCallback(
     (file: File) => {
