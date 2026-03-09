@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryProvider } from "@/components/query-provider";
 import { AuthInit } from "@/components/auth-init";
+import { NavProgress } from "@/components/nav-progress";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,6 +37,9 @@ export default function RootLayout({
         >
           <QueryProvider>
             <AuthInit />
+            <Suspense>
+              <NavProgress />
+            </Suspense>
             <TooltipProvider>{children}</TooltipProvider>
           </QueryProvider>
         </body>
