@@ -82,11 +82,7 @@ export default function Dashboard() {
   const totalInProgress = degreeQuery.data?.total_credits_in_progress ?? 0;
   const progressPct = degreeQuery.data?.progress_pct ?? 0;
   const loading = profileLoading || recsQuery.isPending || degreeQuery.isPending;
-  const apiStatus: "connected" | "error" | "loading" = loading
-    ? "loading"
-    : recsQuery.isError || degreeQuery.isError
-      ? "error"
-      : "connected";
+  const hasError = !loading && (recsQuery.isError || degreeQuery.isError);
 
   const requirementTypeMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -290,13 +286,13 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-            ) : apiStatus === "error" && courses.length === 0 ? (
+            ) : hasError && courses.length === 0 ? (
               <div className="text-center py-16 border border-sift-red/20 bg-sift-red/5 rounded-lg">
                 <p className="text-sift-red text-sm font-medium mb-2">
-                  Failed to connect to API
+                  Unable to load recommendations
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  Make sure the backend is running on port 3001
+                  We&apos;re having trouble reaching our servers. Please try again in a moment.
                 </p>
               </div>
             ) : (
@@ -343,9 +339,13 @@ export default function Dashboard() {
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   My Courses
                 </span>
-                <span className="text-xs text-sift-amber font-mono tabular-nums">
-                  {completedCourses.length} done{inProgressCourses.length > 0 ? `, ${inProgressCourses.length} IP` : ""}
-                </span>
+                {profileLoading ? (
+                  <div className="h-3 w-16 bg-muted rounded animate-pulse" />
+                ) : (
+                  <span className="text-xs text-sift-amber font-mono tabular-nums">
+                    {completedCourses.length} done{inProgressCourses.length > 0 ? `, ${inProgressCourses.length} IP` : ""}
+                  </span>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -424,23 +424,62 @@ export default function Dashboard() {
 
             {/* Degree Progress */}
             <div className="border border-border rounded-lg p-4 bg-card shadow-sm">
-              <DegreeProgress
-                remaining={remaining}
-                totalRequired={totalRequired}
-                totalCompleted={totalCompleted}
-                totalInProgress={totalInProgress}
-                progressPct={progressPct}
-              />
+              {profileLoading ? (
+                <div className="space-y-5 animate-pulse">
+                  <div>
+                    <div className="flex items-baseline justify-between mb-2">
+                      <div className="h-3 w-28 bg-muted rounded" />
+                      <div className="h-7 w-12 bg-muted rounded" />
+                    </div>
+                    <div className="h-2.5 bg-muted rounded-full mb-1.5" />
+                    <div className="flex justify-between">
+                      <div className="h-3 w-24 bg-muted rounded" />
+                      <div className="h-3 w-20 bg-muted rounded" />
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i}>
+                        <div className="flex justify-between mb-1">
+                          <div className="h-3 w-24 bg-muted rounded" />
+                          <div className="h-3 w-12 bg-muted rounded" />
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <DegreeProgress
+                  remaining={remaining}
+                  totalRequired={totalRequired}
+                  totalCompleted={totalCompleted}
+                  totalInProgress={totalInProgress}
+                  progressPct={progressPct}
+                />
+              )}
             </div>
 
             {/* Weights */}
-            <WeightControls weights={weights} onWeightsChange={handleWeightsChange} />
+            {profileLoading ? (
+              <div className="border border-border rounded-lg bg-card shadow-sm overflow-hidden animate-pulse">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <div className="h-3.5 w-3.5 bg-muted rounded" />
+                    <div className="h-3 w-28 bg-muted rounded" />
+                  </div>
+                  <div className="h-3 w-3 bg-muted rounded" />
+                </div>
+              </div>
+            ) : (
+              <WeightControls weights={weights} onWeightsChange={handleWeightsChange} />
+            )}
 
           </aside>
         </div>
       </div>
 
-      <SiteFooter apiStatus={apiStatus} />
+      <SiteFooter />
     </div>
   );
 }
