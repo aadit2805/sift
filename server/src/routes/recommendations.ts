@@ -2,8 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { supabase } from "../db/supabase.js";
 import { scoreCourse, rankCourses } from "../services/scoring.js";
+import { detectKillerCombos } from "../services/workload.js";
 import type { UserPreferences, DegreeRequirement } from "../types/index.js";
 import { DEFAULT_PREFERENCES } from "../types/index.js";
+import { buildSatisfiedSet, computeRemainingCourseKeys } from "../services/requirements.js";
 
 export const recommendationsRouter = Router();
 
@@ -11,7 +13,18 @@ const RecommendationsSchema = z.object({
   major: z.string().max(10).optional(),
   completed_courses: z.array(z.string().max(20)).max(200).default([]),
   in_progress_courses: z.array(z.string().max(20)).max(50).default([]),
-  preferences: z.record(z.number().min(0).max(1)).optional().default({}),
+  preferences: z.object({
+    weight_gpa: z.number().min(0).max(1).optional(),
+    weight_professor: z.number().min(0).max(1).optional(),
+    weight_would_take_again: z.number().min(0).max(1).optional(),
+    weight_difficulty: z.number().min(0).max(1).optional(),
+    weight_requirement: z.number().min(0).max(1).optional(),
+    weight_schedule: z.number().min(0).max(1).optional(),
+    min_credits: z.number().min(1).max(21).optional(),
+    max_credits: z.number().min(1).max(21).optional(),
+    preferred_times: z.array(z.enum(["morning", "afternoon", "evening"])).optional(),
+    excluded_courses: z.array(z.string().max(20)).optional(),
+  }).optional().default({}),
   semester: z.string().max(20).default("Fall 2026"),
 });
 
@@ -58,61 +71,15 @@ recommendationsRouter.post("/", async (req, res) => {
 
     const requirements: DegreeRequirement[] = plan?.requirements || [];
 
-    // Build a set of all satisfied courses (completed or in-progress) including equivalents
-    const satisfiedCourses = new Set(excludedSet);
-    for (const req of requirements) {
-      if (!req.equivalents) continue;
-      for (const [canonical, equivs] of Object.entries(req.equivalents)) {
-        if (excludedSet.has(canonical.toUpperCase())) {
-          // Canonical completed/IP — mark all equivalents as satisfied too
-          for (const eq of equivs) satisfiedCourses.add(eq.toUpperCase());
-        } else {
-          // Check if any equivalent is completed/IP — mark canonical as satisfied
-          for (const eq of equivs) {
-            if (excludedSet.has(eq.toUpperCase())) {
-              satisfiedCourses.add(canonical.toUpperCase());
-              break;
-            }
-          }
-        }
-      }
-    }
+    // Build satisfied set including equivalents
+    const satisfiedCourses = buildSatisfiedSet(excludedSet, requirements);
 
-    // Helper to get credit value for a course within a requirement
-    function getCourseCredits(code: string, req: DegreeRequirement): number {
-      return req.credits_map?.[code] ?? 3;
-    }
-
-    // 2. Compute remaining requirements (equivalency + pick-type aware)
-    const remainingReqs = requirements
-      .map((req) => {
-        const selectionRule = req.selection_rule ?? "all";
-
-        // Calculate credits completed in this category
-        let creditsCompleted = 0;
-        for (const course of req.courses) {
-          if (satisfiedCourses.has(course.toUpperCase())) {
-            creditsCompleted += getCourseCredits(course, req);
-          }
-        }
-
-        // For pick-type requirements that are fully satisfied, return empty courses
-        if (selectionRule === "pick" && creditsCompleted >= req.credits_needed) {
-          return { ...req, courses: [] as string[] };
-        }
-
-        return {
-          ...req,
-          courses: req.courses.filter((c: string) => !satisfiedCourses.has(c.toUpperCase())),
-        };
-      })
-      .filter((req) => req.courses.length > 0);
-
-    // 3. Get all eligible courses (not completed, prereqs met)
-    const allRemainingCourseKeys = remainingReqs.flatMap((r) => r.courses);
+    // 2. Compute remaining requirements
+    const { remainingReqs, allRemainingKeys: allRemainingCourseKeys } =
+      computeRemainingCourseKeys(requirements, satisfiedCourses);
 
     if (allRemainingCourseKeys.length === 0) {
-      res.json({ data: [], error: null });
+      res.json({ data: { courses: [], warnings: [] }, error: null });
       return;
     }
 
@@ -130,7 +97,7 @@ recommendationsRouter.post("/", async (req, res) => {
       .in("department", departments);
 
     if (!courses || courses.length === 0) {
-      res.json({ data: [], error: null });
+      res.json({ data: { courses: [], warnings: [] }, error: null });
       return;
     }
 
@@ -223,8 +190,9 @@ recommendationsRouter.post("/", async (req, res) => {
     }
 
     const ranked = rankCourses(scored);
+    const warnings = detectKillerCombos(ranked, userPrefs.max_credits);
 
-    res.json({ data: ranked, error: null });
+    res.json({ data: { courses: ranked, warnings }, error: null });
   } catch (err) {
     console.error("Recommendations error:", err);
     res.status(500).json({ data: null, error: "Internal server error" });

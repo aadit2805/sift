@@ -10,6 +10,7 @@ import { professorsRouter } from "./routes/professors.js";
 import { degreePlanRouter } from "./routes/degree-plan.js";
 import { transcriptRouter } from "./routes/transcript.js";
 import { userRouter } from "./routes/user.js";
+import { plannerRouter } from "./routes/planner.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -60,6 +61,7 @@ app.use("/api/professors", professorsRouter);
 app.use("/api/degree-plan", degreePlanRouter);
 app.use("/api/transcript", transcriptRouter);
 app.use("/api/user", userRouter);
+app.use("/api/planner", plannerRouter);
 
 app.listen(PORT, () => {
   console.log(`Sift API running on port ${PORT}`);

@@ -111,13 +111,68 @@ export interface ScoreBreakdown {
   total: number;
 }
 
+export interface RemainingRequirement extends DegreeRequirement {
+  remaining_courses: string[];
+  completed_courses: string[];
+  in_progress_courses: string[];
+  credits_completed: number;
+  credits_in_progress: number;
+  is_satisfied: boolean;
+  equivalent_matches?: Record<string, string>;
+}
+
+export interface WorkloadWarning {
+  courses: [string, string];
+  severity: "caution" | "danger";
+  reason: string;
+}
+
+export interface RecommendationsResponse {
+  courses: ScoredCourse[];
+  warnings: WorkloadWarning[];
+}
+
+// --- V2: Multi-Semester Planner Types ---
+
+export interface PlannedCourse {
+  code: string;
+  name: string;
+  credits: number;
+  requirement_type: string;
+}
+
+export interface PlanScores {
+  total_semesters: number;
+  projected_gpa: number;
+  workload_variance: number;
+  avg_professor_rating: number;
+}
+
+export interface GeneratedPlan {
+  objective: "fastest" | "highest_gpa" | "balanced" | "best_professors";
+  semesters: { term: string; courses: PlannedCourse[] }[];
+  scores: PlanScores;
+}
+
+export interface SemesterPlan {
+  id: string;
+  user_id: string;
+  name: string;
+  objective: string;
+  semesters: { term: string; courses: PlannedCourse[] }[];
+  scores: PlanScores;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export const DEFAULT_PREFERENCES: UserPreferences = {
   weight_gpa: 0.25,
   weight_professor: 0.20,
   weight_would_take_again: 0.15,
   weight_difficulty: 0.15,
   weight_requirement: 0.15,
-  weight_schedule: 0.10,
+  weight_schedule: 0,
   min_credits: 12,
   max_credits: 18,
   preferred_times: ["morning", "afternoon"],
