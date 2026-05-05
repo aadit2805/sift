@@ -1,5 +1,6 @@
 "use client";
 
+import { RequireAuth } from "@/components/require-auth";
 import { useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -172,6 +173,7 @@ export default function Dashboard() {
   }, [updateProfile, queryClient]);
 
   return (
+    <RequireAuth>
     <div className="min-h-screen bg-background">
       <SiteHeader semester={semester} onSemesterChange={handleSemesterChange} />
 
@@ -502,5 +504,6 @@ export default function Dashboard() {
 
       <SiteFooter />
     </div>
+    </RequireAuth>
   );
 }

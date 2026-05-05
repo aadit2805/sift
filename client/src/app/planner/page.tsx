@@ -1,5 +1,6 @@
 "use client";
 
+import { RequireAuth } from "@/components/require-auth";
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -122,6 +123,7 @@ export default function PlannerPage() {
   const selectedPlan = plans?.[selectedIdx] ?? null;
 
   return (
+    <RequireAuth>
     <div className="min-h-screen bg-background">
       <SiteHeader />
 
@@ -499,5 +501,6 @@ export default function PlannerPage() {
 
       <SiteFooter />
     </div>
+    </RequireAuth>
   );
 }

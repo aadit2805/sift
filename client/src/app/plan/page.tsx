@@ -1,5 +1,6 @@
 "use client";
 
+import { RequireAuth } from "@/components/require-auth";
 import { Badge } from "@/components/ui/badge";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -84,6 +85,7 @@ export default function PlanPage() {
   const satisfiedCount = remaining.filter((r) => r.is_satisfied).length;
 
   return (
+    <RequireAuth>
     <div className="min-h-screen bg-background">
       <SiteHeader />
 
@@ -453,5 +455,6 @@ export default function PlanPage() {
 
       <SiteFooter />
     </div>
+    </RequireAuth>
   );
 }

@@ -1,19 +1,10 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-
-const isProtectedRoute = createRouteMatcher(["/", "/plan(.*)", "/planner(.*)"]);
-
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect();
-  }
-});
+// Clerk's middleware is incompatible with both Edge (Node-only deps) and Node
+// runtimes in Next 16 + Clerk 6 right now. Route protection is enforced
+// per-page via <SignedOut><RedirectToSignIn /></SignedOut> instead.
+export default function middleware() {
+  return;
+}
 
 export const config = {
-  runtime: "nodejs",
-  matcher: [
-    // Skip Next.js internals and static files
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes
-    "/(api|trpc)(.*)",
-  ],
+  matcher: [],
 };
