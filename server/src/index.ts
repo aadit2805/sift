@@ -15,6 +15,9 @@ import { plannerRouter } from "./routes/planner.js";
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust the platform proxy so X-Forwarded-For is honored by rate-limit
+app.set("trust proxy", 1);
+
 // Security headers
 app.use(helmet());
 
