@@ -65,9 +65,10 @@ export default function PlanPage() {
 
   const completedCourses = profile?.completed_courses ?? [];
   const inProgressCourses = profile?.in_progress_courses ?? [];
+  const major = profile?.major || "CS";
 
   const { data: degreeData, isLoading: degreeLoading } = useRemainingRequirements(
-    "CS",
+    major,
     completedCourses,
     inProgressCourses,
     !!profile

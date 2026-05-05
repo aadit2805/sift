@@ -15,6 +15,8 @@ import {
 import { CourseCard } from "@/components/course-card";
 import { DegreeProgress } from "@/components/degree-progress";
 import { WeightControls } from "@/components/weight-controls";
+import { FiltersPanel } from "@/components/filters-panel";
+import { WorkloadWarnings } from "@/components/workload-warnings";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TranscriptUpload } from "@/components/transcript-upload";
@@ -54,28 +56,33 @@ export default function Dashboard() {
   const completedCourses = profile?.completed_courses ?? [];
   const inProgressCourses = profile?.in_progress_courses ?? [];
   const semester = profile?.semester ?? getNextSemester();
-  const weights = (profile?.preferences as Record<string, number> | undefined) ?? {
-    weight_gpa: DEFAULT_PREFERENCES.weight_gpa,
-    weight_professor: DEFAULT_PREFERENCES.weight_professor,
-    weight_difficulty: DEFAULT_PREFERENCES.weight_difficulty,
-    weight_requirement: DEFAULT_PREFERENCES.weight_requirement,
+  const preferences = profile?.preferences
+    ? { ...DEFAULT_PREFERENCES, ...profile.preferences }
+    : DEFAULT_PREFERENCES;
+  const weights: Record<string, number> = {
+    weight_gpa: preferences.weight_gpa,
+    weight_professor: preferences.weight_professor,
+    weight_difficulty: preferences.weight_difficulty,
+    weight_requirement: preferences.weight_requirement,
   };
+  const major = profile?.major || "CS";
   const profileReady = !!profile;
 
   const recsQuery = useRecommendations(
     {
-      major: "CS",
+      major,
       completed_courses: completedCourses,
       in_progress_courses: inProgressCourses,
-      preferences: weights,
+      preferences,
       semester,
     },
     profileReady
   );
 
-  const degreeQuery = useRemainingRequirements("CS", completedCourses, inProgressCourses, profileReady);
+  const degreeQuery = useRemainingRequirements(major, completedCourses, inProgressCourses, profileReady);
 
-  const courses = recsQuery.data ?? [];
+  const courses = recsQuery.data?.courses ?? [];
+  const warnings = recsQuery.data?.warnings ?? [];
   const remaining = degreeQuery.data?.remaining ?? [];
   const totalRequired = degreeQuery.data?.total_credits_required ?? 0;
   const totalCompleted = degreeQuery.data?.total_credits_completed ?? 0;
@@ -121,8 +128,12 @@ export default function Dashboard() {
   }, [updateProfile, queryClient]);
 
   const handleWeightsChange = useCallback((w: Record<string, number>) => {
-    updateProfile.mutate({ preferences: w } as Record<string, unknown>);
-  }, [updateProfile]);
+    updateProfile.mutate({ preferences: { ...preferences, ...w } } as Record<string, unknown>);
+  }, [updateProfile, preferences]);
+
+  const handleFiltersChange = useCallback((filters: Partial<import("@/lib/types").UserPreferences>) => {
+    updateProfile.mutate({ preferences: { ...preferences, ...filters } } as Record<string, unknown>);
+  }, [updateProfile, preferences]);
 
   const handleTranscriptCourses = useCallback(
     (parsed: { code: string; name: string; credits: number; grade: string }[]) => {
@@ -260,6 +271,8 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
+
+            {!loading && <WorkloadWarnings warnings={warnings} />}
 
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -459,6 +472,14 @@ export default function Dashboard() {
                 />
               )}
             </div>
+
+            {/* Filters */}
+            {!profileLoading && (
+              <FiltersPanel
+                preferences={preferences}
+                onFiltersChange={handleFiltersChange}
+              />
+            )}
 
             {/* Weights */}
             {profileLoading ? (

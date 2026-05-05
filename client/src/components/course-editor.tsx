@@ -117,58 +117,6 @@ export function CourseEditor({
         className="h-8 bg-background border-border text-xs"
       />
 
-      {/* Selected chips */}
-      {(completed.size > 0 || inProgress.size > 0) && (
-        <div className="flex flex-wrap gap-1">
-          {Array.from(completed)
-            .sort()
-            .map((code) => (
-              <Badge
-                key={code}
-                className="bg-sift-green/10 text-sift-green border-sift-green/15 text-[9px] font-mono px-1.5 py-0 h-5 cursor-pointer hover:bg-sift-green/20 rounded-full"
-                onClick={() => removeChip(code)}
-              >
-                {code}
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="ml-1"
-                >
-                  <path d="M18 6 6 18" />
-                  <path d="m6 6 12 12" />
-                </svg>
-              </Badge>
-            ))}
-          {Array.from(inProgress)
-            .sort()
-            .map((code) => (
-              <Badge
-                key={code}
-                className="bg-sift-amber/10 text-sift-amber border-sift-amber/15 text-[9px] font-mono px-1.5 py-0 h-5 cursor-pointer hover:bg-sift-amber/20 rounded-full"
-                onClick={() => removeChip(code)}
-              >
-                {code}
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="ml-1"
-                >
-                  <path d="M18 6 6 18" />
-                  <path d="m6 6 12 12" />
-                </svg>
-              </Badge>
-            ))}
-        </div>
-      )}
-
       {/* Legend */}
       <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
@@ -185,8 +133,8 @@ export function CourseEditor({
         </span>
       </div>
 
-      {/* Course list */}
-      <ScrollArea className="h-64 border border-border rounded-lg">
+      {/* Course list — takes remaining height */}
+      <ScrollArea className="h-[calc(100vh-280px)] border border-border rounded-lg">
         {loading ? (
           <div className="p-4 text-center">
             <p className="text-xs text-muted-foreground">
