@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/courses", label: "Courses" },
   { href: "/professors", label: "Professors" },
   { href: "/plan", label: "Plan" },
+  { href: "/planner", label: "Planner" },
 ];
 
 function getSemesterOptions(): string[] {

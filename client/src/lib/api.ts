@@ -5,10 +5,13 @@ import type {
   DegreeProgress,
   UserPreferences,
   UserProfile,
+  RecommendationsResponse,
+  GeneratedPlan,
+  SemesterPlan,
 } from "./types";
 import { getToken } from "./auth-token";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 async function fetcher<T>(
   path: string,
@@ -66,7 +69,7 @@ export async function getRecommendations(params: {
   preferences?: Partial<UserPreferences>;
   semester?: string;
 }) {
-  return fetcher<ScoredCourse[]>("/api/recommendations", {
+  return fetcher<RecommendationsResponse>("/api/recommendations", {
     method: "POST",
     body: JSON.stringify(params),
   });
@@ -138,5 +141,44 @@ export async function migrateLocalData(data: {
   return fetcher<UserProfile>("/api/user/profile/migrate", {
     method: "POST",
     body: JSON.stringify(data),
+  });
+}
+
+// --- Planner API (V2) ---
+
+export async function generateSemesterPlans(params: {
+  major: string;
+  completed_courses: string[];
+  in_progress_courses?: string[];
+  start_semester: string;
+  min_credits?: number;
+  max_credits?: number;
+  include_summer?: boolean;
+}) {
+  return fetcher<GeneratedPlan[]>("/api/planner/generate", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export async function saveSemesterPlan(plan: {
+  name?: string;
+  objective: string;
+  semesters: GeneratedPlan["semesters"];
+  scores: GeneratedPlan["scores"];
+}) {
+  return fetcher<SemesterPlan>("/api/planner/save", {
+    method: "POST",
+    body: JSON.stringify(plan),
+  });
+}
+
+export async function getSavedPlans() {
+  return fetcher<SemesterPlan[]>("/api/planner/plans");
+}
+
+export async function deleteSavedPlan(id: string) {
+  return fetcher<{ deleted: boolean }>(`/api/planner/plans/${id}`, {
+    method: "DELETE",
   });
 }

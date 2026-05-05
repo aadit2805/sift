@@ -13,8 +13,13 @@ import {
   getRemainingRequirements,
   getUserProfile,
   updateUserProfile,
+  generateSemesterPlans,
+  saveSemesterPlan,
+  getSavedPlans,
+  deleteSavedPlan,
+  API_BASE,
 } from "./api";
-import type { UserPreferences, UserProfile } from "./types";
+import type { UserPreferences, UserProfile, RecommendationsResponse, GeneratedPlan, SemesterPlan } from "./types";
 import { getToken } from "./auth-token";
 
 // --- Query key factory ---
@@ -51,6 +56,10 @@ export const queryKeys = {
   user: {
     all: ["user"] as const,
     profile: ["user", "profile"] as const,
+  },
+  planner: {
+    all: ["planner"] as const,
+    savedPlans: ["planner", "saved"] as const,
   },
 };
 
@@ -159,8 +168,6 @@ export function useUpdateProfile() {
 
 // --- Mutation hooks ---
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
 export function useTranscriptUpload() {
   const queryClient = useQueryClient();
 
@@ -193,6 +200,44 @@ export function useTranscriptUpload() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.recommendations.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.degreePlan.all });
+    },
+  });
+}
+
+// --- Planner hooks (V2) ---
+
+export function useGeneratePlans() {
+  return useMutation({
+    mutationFn: (params: Parameters<typeof generateSemesterPlans>[0]) =>
+      generateSemesterPlans(params).then(unwrap),
+  });
+}
+
+export function useSavePlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (plan: Parameters<typeof saveSemesterPlan>[0]) =>
+      saveSemesterPlan(plan).then(unwrap),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.planner.savedPlans });
+    },
+  });
+}
+
+export function useSavedPlans(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.planner.savedPlans,
+    queryFn: () => getSavedPlans().then(unwrap),
+    enabled,
+  });
+}
+
+export function useDeletePlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteSavedPlan(id).then(unwrap),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.planner.savedPlans });
     },
   });
 }
